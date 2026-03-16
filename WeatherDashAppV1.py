@@ -391,7 +391,6 @@ class WeatherApp:
         self.city_entry.delete(0, tk.END)
     
     def update_data(self):
-        print(self.display_forecast)
         # is in celsius
         self.go_to_C()
         # checks if the coords exist
@@ -606,6 +605,10 @@ class WeatherApp:
         canvas = FigureCanvasTkAgg(fig, master=graph_window)
         canvas.draw()
         canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
+
+    def make_hour_graph(self):
+        '''
+        This function makes a graph about the hourly forecasts'''
 
     def bind_recursive(self, widget, event, callback):
         widget.bind(event, callback)
