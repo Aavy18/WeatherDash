@@ -11,9 +11,12 @@ The weather information comes from Open Weather Map
 
 import requests
 # you can get a weather key from open weather map
-from config import weatherKey
+from configCopy import weatherKey
 import tkinter as tk
 import datetime
+
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 class WeatherApp:
     def __init__(self, root, loc):
@@ -325,6 +328,7 @@ class WeatherApp:
             if day != self.display_forecast[-1]:
                 tk.Frame(forecast_card, bg=t["bg"], height=1).pack(fill="x", padx=5)
 
+        self.bind_recursive(forecast_card, "<Button-1>", lambda e: self.make_forecast_graph())
 
         # hourly forecast section
         tk.Label(self.frame, text="Hourly Forecast", font=("Georgia", 14, "bold"),
@@ -387,6 +391,7 @@ class WeatherApp:
         self.city_entry.delete(0, tk.END)
     
     def update_data(self):
+        print(self.display_forecast)
         # is in celsius
         self.go_to_C()
         # checks if the coords exist
@@ -559,3 +564,51 @@ class WeatherApp:
         self.city_entry.configure(bg=t["card"])
         for btn in [self.update_btn, self.switch_F_btn, self.switch_C_btn, self.change_city_btn]:
             btn.configure(bg=t["btn"], highlightbackground=t["btn"])
+
+    def make_forecast_graph(self):
+        '''
+        This function will make a graph based on the forecast 
+        It can either be an hourly graph or a weekly graph
+        '''
+        # creates new window for the graph
+        graph_window = tk.Toplevel(self.root)
+        graph_window.title("Forecast Graph")
+
+        # uses the current theme
+        graph_window.configure(bg=self.themes[self.currTheme]["bg"])
+
+        # creates matplotlib window
+        fig = Figure(figsize=(6, 4), dpi=100)
+        ax = fig.add_subplot(111)
+        t = self.themes[self.currTheme]
+
+
+        # extracts data from display_forecast
+        dates = [datetime.datetime.strptime(item['date'], '%Y-%m-%d').strftime('%b %d') for item in self.display_forecast]        
+        highs = [item["temp_max"] for item in self.display_forecast]
+        lows = [item["temp_min"] for item in self.display_forecast]
+        avgs = [(l+h)/2 for l,h in zip(lows, highs)]
+
+        ax.plot(dates, highs, color="#ff6b6b", marker='o', label='High')
+        ax.plot(dates, lows, color="#4a90d9", marker='o', label='Low')
+        ax.plot(dates, avgs, color="#f6c337", marker='o', label='Avg', linestyle='--')
+
+        # style to match theme
+        ax.set_title("5-Day Forecast", color=t["fg"])
+        ax.legend(fontsize=8)
+        ax.tick_params(colors=t["fg"])
+        fig.patch.set_facecolor(t["card"])
+        ax.set_facecolor(t["card"])
+        for spine in ax.spines.values():
+            spine.set_edgecolor(t["fg"])
+
+        # embed into new window
+        canvas = FigureCanvasTkAgg(fig, master=graph_window)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
+
+    def bind_recursive(self, widget, event, callback):
+        widget.bind(event, callback)
+        widget.config(cursor="hand2")
+        for child in widget.winfo_children():
+            self.bind_recursive(child, event, callback)
