@@ -3,8 +3,8 @@ Aavy18
 Weather App Class
 
 This project is a desktop weather app
-It has the weather for the current date, high/low, humidity and windspeed, sunrise/sunset 
-it also has an hourly forecast and a 5 day forecast
+It has the weather for today, high/low, humidity and windspeed, sunrise sunset 
+it also has a forecast
 
 The weather information comes from Open Weather Map
 '''
@@ -19,6 +19,7 @@ class WeatherApp:
     def __init__(self, root, loc):
 
         self.location = loc
+        self.coords = None
 
         self.themes = {
             "day":      {"bg": "#87CEEB", "fg": "#1a1a2e", "card": "#6ab4d4", "text": "#1a1a2e", "btn": "#4a7ab5"},
@@ -35,7 +36,7 @@ class WeatherApp:
         root.resizable(False, False)
         root.configure(bg=init_t["bg"])
 
-        # any  nicknames can go here
+        # any other nicknames can go here
         self.nicknames = {
             "new york": "big apple",
             "jaipur": "pink city",
@@ -115,7 +116,7 @@ class WeatherApp:
         self.update_data()
         self.update_time()
 
-    def get_data(self, CITY):
+    def get_data_city(self, CITY):
         '''
         Gets the data from open weather map
         Inputs are the city
@@ -123,6 +124,14 @@ class WeatherApp:
         '''
         try:
             url = f"https://api.openweathermap.org/data/2.5/weather?q={CITY}&appid={weatherKey}&units=metric"
+            resp = requests.get(url)
+            return resp.json()
+        except requests.exceptions.ConnectionError:
+            return {"cod": "connection_error"}
+    
+    def get_data_coords(self, lat, lon):
+        try:
+            url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={weatherKey}&units=metric"
             resp = requests.get(url)
             return resp.json()
         except requests.exceptions.ConnectionError:
@@ -153,9 +162,17 @@ class WeatherApp:
                     cleanData |= data[header]
         return cleanData
     
-    def get_forecast(self, CITY):
+    def get_forecast_city(self, CITY):
         try:
             url = f"https://api.openweathermap.org/data/2.5/forecast?q={CITY}&appid={weatherKey}&units=metric"
+            resp = requests.get(url)
+            return resp.json()
+        except requests.exceptions.ConnectionError:
+            return {"cod": "connection_error"}
+        
+    def get_forecast_coords(self, lat, lon):
+        try:
+            url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={weatherKey}&units=metric"
             resp = requests.get(url)
             return resp.json()
         except requests.exceptions.ConnectionError:
@@ -238,6 +255,10 @@ class WeatherApp:
 
         tk.Label(self.frame, text=f"Weather in {self.get_display_name()}, {self.display_data['country']}",
                 font=("Georgia", 22, "bold"), fg=t["fg"], bg=t["bg"]).pack(pady=10)
+        
+        if self.coords:
+            tk.Label(self.frame, text=f"{self.coords[0]:.4f}, {self.coords[1]:.4f}",
+                    font=("Georgia", 11), fg=t["text"], bg=t["bg"]).pack()
         
         self.time_label = tk.Label(self.frame, text=f"{self.get_local_time().strftime('%b %d, %Y')} | {self.get_local_time().strftime('%I:%M:%S %p')}",
                 font=("Georgia", 14), fg=t["fg"], bg=t["bg"])
@@ -336,6 +357,25 @@ class WeatherApp:
         hourly_frame.update_idletasks()
         hourly_canvas.configure(scrollregion=hourly_canvas.bbox("all"))
 
+    def is_coords(self, text):
+        '''
+        This function determines if the entered field is coords or a city
+        param text: the text field
+        returns boolean of if it is a coords
+        '''
+        # splits into parts
+        parts = text.split(',')
+        # ensures it is 2 parts n/s, and e/w
+        if len(parts) == 2:
+            try:
+                # turns it into
+                float(parts[0].strip())
+                float(parts[1].strip())
+                return True
+            except ValueError:
+                return False
+        return False
+
     def set_location(self):
         # gets the new location from the field
         newLoc = self.city_entry.get().lower()
@@ -349,8 +389,17 @@ class WeatherApp:
     def update_data(self):
         # is in celsius
         self.go_to_C()
-        # gets the data
-        data = self.parse_data(self.get_data(self.location))
+        # checks if the coords exist
+        if self.is_coords(self.location):
+            # finds coords
+            lat, lon = [x.strip() for x in self.location.split(',')]
+            data = self.parse_data(self.get_data_coords(lat, lon))
+            raw_forecast = self.get_forecast_coords(lat, lon)
+        else:
+            data = self.parse_data(self.get_data_city(self.location))
+            raw_forecast = self.get_forecast_city(self.location)
+
+
         if data.get('cod') == 'connection_error':
             self.show_connection_error()
             return
@@ -361,10 +410,10 @@ class WeatherApp:
         self.base_data = data.copy()
         # uses the display data on the tkinter widget 
         self.display_data = data.copy()
+        self.coords = (data['lat'], data['lon'])
         self.display_data['unit'] = 'C'
 
         # gets forecast and hourly data
-        raw_forecast = self.get_forecast(self.location)
         self.forecast_data = self.parse_forecast(raw_forecast)
         self.hourly_data = self.parse_hourly(raw_forecast)
         self.display_forecast = [day.copy() for day in self.forecast_data]
