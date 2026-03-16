@@ -361,6 +361,8 @@ class WeatherApp:
         hourly_frame.update_idletasks()
         hourly_canvas.configure(scrollregion=hourly_canvas.bbox("all"))
 
+        self.bind_recursive(hourly_frame, "<Button-1>", lambda e: self.make_hour_graph())
+
     def is_coords(self, text):
         '''
         This function determines if the entered field is coords or a city
@@ -608,7 +610,46 @@ class WeatherApp:
 
     def make_hour_graph(self):
         '''
-        This function makes a graph about the hourly forecasts'''
+        This function makes a graph about the hourly forecasts
+        '''
+        # creates new window for the graph
+        graph_window = tk.Toplevel(self.root)
+        graph_window.title("Forecast Graph")
+
+        # uses the current theme
+        graph_window.configure(bg=self.themes[self.currTheme]["bg"])
+
+        # creates matplotlib window
+        fig = Figure(figsize=(8, 4), dpi=100)
+        ax = fig.add_subplot(111)
+        t = self.themes[self.currTheme]
+
+        # extracts the time and temp from the display_hourly
+        # user cannot see temp form without this graph
+        today = self.get_local_time().strftime('%Y-%m-%d')
+        times = [item['time'] if item['date'] == today else f"Tmrw {item['time']}" for item in self.display_hourly[:24]]
+        temps = [item['temp'] for item in self.display_hourly[:24]]
+
+        # allows each time frame to be plotted individually
+        x = range(len(times))
+        ax.plot(x, temps, color=t["text"], marker='o', label='Temp')
+        ax.set_xticks(x)
+        ax.set_xticklabels(times, rotation=45, ha='right', fontsize=7)
+
+        # style it 
+        ax.set_title("Hourly Forecast", color=t["fg"])
+        ax.legend(fontsize=8)
+        ax.tick_params(colors=t["fg"])
+        fig.patch.set_facecolor(t["card"])
+        ax.set_facecolor(t["card"])
+        for spine in ax.spines.values():
+            spine.set_edgecolor(t["fg"])
+
+        fig.tight_layout()
+
+        canvas = FigureCanvasTkAgg(fig, master=graph_window)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
 
     def bind_recursive(self, widget, event, callback):
         widget.bind(event, callback)
